@@ -1,0 +1,102 @@
+---
+title: "Sept 21st Assignment Trying"
+format: 
+    html:
+      output-file: "index.html"
+editor: visual
+---
+
+# Sep 21 Assignment (Due Sep 23)
+
+```{r}
+#| echo: false
+#| warning: false
+library(dplyr)
+library(tidyr)
+library(reactable)
+library(readr)
+```
+
+```{r}
+df <- read_csv("timesData.csv")
+reactable(df, defaultPageSize = 4, searchable = TRUE)
+```
+
+```{r}
+rankings_upenn <- df |>
+  filter(grepl("University of Pennsylvania", university_name)) |>
+  arrange(year)
+
+reactable(rankings_upenn, defaultPageSize = 4, searchable = TRUE)
+
+plot(rankings_upenn$year, as.numeric(rankings_upenn$world_rank),
+     main = "UG Year vs University Rank",
+     xlab = "Year",
+     ylab = "University Global Rank",
+     type = "l"
+)
+```
+
+```{r}
+rankings_UC <- df |>
+  filter(grepl("University of California, Berkeley", university_name)) |>
+  arrange(year)
+
+plot(rankings_UC$year, as.numeric(rankings_UC$world_rank),
+     main = "UG Year vs University Rank",
+     xlab = "Year",
+     ylab = "University Global Rank",
+     type = "l"
+)
+```
+
+::: {fig-University-Ranking-Comparison}
+```{r}
+#| code-fold: true
+#| layout-ncol: 2
+#| fig-cap:
+#| - "UPenn"
+#| - "UC Berkeley"
+
+plot(rankings_upenn$year, as.numeric(rankings_upenn$world_rank),
+  main = "UPenn Rank v. Year",
+  xlab = "Year",
+  ylab = "Global Rank",
+  type = "l"
+)
+
+
+plot(rankings_UC$year, as.numeric(rankings_UC$world_rank),
+     main = "UC Berkeley Rank v. Year",
+     xlab = "Year",
+     ylab = "Global Rank",
+     type = "l"
+)
+
+```
+
+UC Berkeley vs UPenn Global Ranking
+:::
+
+::: {fig-TOP50-US-Universities}
+```{r}
+# Did the number of US universities that rank in the top 50 change much through the years?
+rankingstop50 <- df |>
+  filter(grepl("United States of America", country)) |>
+  mutate(world_rank = as.numeric(world_rank)) |>
+  filter(world_rank <=50) |>
+  distinct(year, university_name) |>
+  count(year) |>
+  arrange(year)
+  
+
+plot(rankingstop50$year, rankingstop50$n,
+     main = "Top 50 US University Trend",
+     xlab = "Year",
+     ylab = "Number of US Universities in Top 50",
+     type = "l"
+)
+```
+
+I'd say it seems pretty consistent until a big drop in 2015 -> 2016.
+:::
