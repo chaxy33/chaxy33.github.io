@@ -1,0 +1,85 @@
+---
+title: "Exercise Sept 28"
+format: 
+    html:
+      output-file: "index.html"
+editor: visual
+---
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reactable)
+library(plotly)
+library(crosstalk)
+```
+
+```{r}
+df <- read_csv("kaggle university/timesData.csv")
+reactable(df, defaultPageSize = 4, searchable = TRUE)
+```
+
+```{r} 
+# Problem 1A
+most_uni <- df |>
+  count(country) |>
+  arrange(desc(n)) |>
+  head(3)
+
+reactable(most_uni, defaultPageSize = 4, searchable = TRUE)
+
+
+# Problem 1B
+plot <- ggplot(most_uni, aes(country, n)) +
+  geom_col()
+plot
+```
+```{r}
+# Problem 2A
+top_50 <- df |>
+  mutate(world_rank = as.numeric(world_rank)) |>
+  filter(world_rank<=50, year %in% c("2011")) |>
+  distinct(university_name, world_rank, .keep_all = T) |>
+  arrange(world_rank) |>
+  select(world_rank, university_name)
+
+reactable(top_50, defaultPageSize = 4, searchable = TRUE)
+
+# Problem 2B
+# No, it would not be a good candidate because there are duplicates within the ranks. Some ranks are shared by multiple universities.
+
+# Problem 2C
+
+sd = SharedData$new(top_50, key = ~university_name)
+
+filter_slider("Rank_Slider", "World Rank", sd, ~world_rank)
+reactable(sd, defaultPageSize = 4)
+
+```
+
+```{r}
+# Problem 3
+year_2016 <- df |>
+  filter(year %in% c("2016"))
+  
+sd = SharedData$new(year_2016, key=~university_name)
+
+filter_slider("ratio_slider", "Student Staff Ratio", sd, ~student_staff_ratio)
+
+plot1 <- plot_ly(sd, x = ~num_students, y = ~student_staff_ratio, type = 'scatter', mode = 'markers')
+
+plot1
+
+plot2 <- plot_ly(sd, x = ~student_staff_ratio, y= ~teaching, type = 'scatter', mode = 'markers')
+
+plot2
+```
+
+
+
+
+
+
