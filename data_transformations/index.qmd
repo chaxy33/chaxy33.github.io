@@ -1,0 +1,135 @@
+---
+title: "Data Transformations"
+format: 
+    html:
+      output-file: "index.html"
+editor: visual
+---
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reactable)
+library(plotly)
+library(crosstalk)
+```
+
+
+```{r}
+df <- data.frame(
+u1 = c(5, 1, 4, NA, NA, NA, 2, 1),
+u2 = c(5, NA, 3, 2, 5, NA, 2, 1),
+u3 = c(1, 4, 2, 5, 2, NA, 5, 4),
+u4 = c(4, 2, NA, 1, 5, 2, 3, 3)
+)
+
+
+
+cor(df$u1, df$u2, use = "pairwise.complete.obs") # 0.96
+cor(df$u1, df$u3, use = "pairwise.complete.obs") # -.89
+cor(df$u1, df$u4, use = "pairwise.complete.obs") # 0.86
+
+# Use only u4, can't use u2 since there is an NA
+
+u46_prediction <- (2-2.9) + (2.6)
+u46_prediction
+# Prediction is 1.7 --> 2
+
+```
+
+```{r}
+# Problem 2
+df_swapped <- data.frame(
+m1 = c(5, 5, 1, 4),   
+m2 = c(1, NA, 4, 2),  
+m3 = c(4, 3, 2, NA),  
+m4 = c(NA, 2, 5, 1),  
+m5 = c(NA, 5, 2, 5),  
+m6 = c(NA, NA, NA, 2),
+m7 = c(2, 2, 5, 3),  
+m8 = c(1, 1, 4, 3)
+)
+
+
+cor_results <- cor(df_swapped$m1, df_swapped, use = "pairwise.complete.obs")
+
+cor_results
+
+# Movie 5 has the highest correlation with 0.97.
+
+```
+
+```{r}
+# Problem 3A
+new_df <- read_csv("http://manctsui.github.io/datasets/countries.csv")
+
+agriculture_imputed <-
+ ifelse(is.na(new_df$Agriculture),
+ mean(new_df$Agriculture, na.rm = TRUE),
+ new_df$Agriculture)
+
+agriculture_NA_sum <- sum(is.na(new_df$Agriculture))
+agriculture_NA_sum
+
+industry_imputed <-
+  ifelse(is.na(new_df$Industry),
+  mean(new_df$Industry, na.rm = TRUE),
+  new_df$Industry)
+industry_NA_sum <- sum(is.na(new_df$Industry))
+industry_NA_sum
+ 
+
+# Problem 3B
+
+agriculture_NA_sum <- sum(is.na(new_df$Agriculture))
+agriculture_NA_sum
+
+industry_NA_sum <- sum(is.na(new_df$Industry))
+industry_NA_sum
+
+
+
+# 15 NA's filled from Agriculture Column
+# 16 NA's filled from Industry Column
+
+
+```
+
+
+
+``` {r}
+# Problem 4
+df2 <- data.frame(
+temp = c(79, 74, 73, 76, 82, 72, 71, 79, 83, 70, 73, 75, 77),
+chirps = c(44, 40, 38, 43, 48, 37, 34, 45, 51, 32, 35, 42, 43)
+)
+lm(temp ~ chirps, data = df2)
+
+# Explain via a manual computation, how finding cor(df$temp, df$chirps) , mean(df$temp) , sd(df$temp) , mean(df$chirps) , sd(df$chirps) results in the above linear regression equation as well
+
+upd_cor <- cor(df2$temp, df2$chirps, use = "pairwise.complete.obs")
+upd_cor
+
+
+sdtemp <- sd(df2$temp)
+sdchirps <- sd(df2$chirps)
+meantemp <- mean(df2$temp)
+meanchirps <- mean(df2$chirps)
+
+intercept <- upd_cor * (sdtemp/sdchirps)
+slope <- meantemp - (intercept*meanchirps)
+
+intercept
+slope
+
+# The intercept and slope is 0.714 and 46.474 respectively.
+
+# You can compute this by finding the correlation between the temperature and chirps. From here, you can compute the standard deviation and mean of each vector. From this point on, you can find the intercept by multiplying the ratios of the standard deviations with the correlation.
+
+# You can then find the slope by subtracting the intercept multiplied by the mean chirps and subtract that from the mean temperature.
+
+```
+
