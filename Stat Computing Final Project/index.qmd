@@ -1,0 +1,368 @@
+---
+title: "Stat Computing Final Project"
+format: 
+    html:
+      output-file: "index.html"
+editor: visual
+echo: false
+warning: false
+message: false
+---
+```{r}
+#| warning: false
+library(tidyverse)
+library(car)
+library(broom)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reactable)
+library(plotly)
+library(crosstalk)
+library(leaps)
+```
+
+
+```{r}
+credit <- read.csv("credit_risk_dataset.csv", stringsAsFactors = TRUE)
+credit_clean <- na.omit(credit)
+credit_clean <- credit |>
+  na.omit() |>
+  filter(person_age <= 100)
+reactable(credit, defaultPageSize = 4, searchable = TRUE)
+```
+
+```{r}
+grade_query <- credit_clean |>
+  group_by(loan_grade, cb_person_default_on_file) |>
+  summarise(
+    count = n(),
+    mean_loan_int_rate = round(mean(loan_int_rate), 2),
+    .groups = "drop"
+  ) |>
+  arrange(loan_grade, cb_person_default_on_file)
+
+reactable(grade_query, defaultPageSize = 7, searchable = TRUE)
+
+# Assisted Visualization with AI
+
+grade_plot_df <- grade_query |>
+  mutate(
+    default_label = ifelse(cb_person_default_on_file == "Y", "Prior Default on File", "No Prior Default"),
+    hover_text = paste0(
+      "<b>Loan Grade:</b> ", loan_grade, "<br>",
+      "<b>Status:</b> ", default_label, "<br>",
+      "<b>Avg Interest Rate:</b> ", mean_loan_int_rate, "%<br>",
+      "<b>Borrower Count:</b> ", scales::comma(count)
+    )
+  )
+
+overall_avg <- round(mean(credit_clean$loan_int_rate), 2)
+
+p1_pretty <- ggplot(
+  grade_plot_df,
+  aes(x = loan_grade, y = mean_loan_int_rate, fill = default_label, text = hover_text)
+) +
+  geom_col(position = position_dodge(width = 0.78), width = 0.7, alpha = 0.92) +
+  geom_text(
+    aes(label = paste0(mean_loan_int_rate, "%")),
+    position = position_dodge(width = 1.5),
+    vjust = 10,
+    size = 3.5,
+    fontface = "bold",
+    color = "#2C3E50"
+  ) +
+  geom_hline(yintercept = overall_avg, linetype = "dashed", color = "#7F8C8D", linewidth = 0.6) +
+  scale_fill_manual(
+    values = c("No Prior Default" = "#2B5C8F", "Prior Default on File" = "#D95F02")
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0(x, "%"),
+    expand = expansion(mult = c(0, 0.14))
+  ) +
+  labs(
+    title = "Average Loan Interest Rate by Loan Grade & Prior Default",
+    x = "Loan Grade (A = Lowest Risk  →  G = Highest Risk)",
+    y = "Average Loan Interest Rate (%)",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, color = "#1A2530", margin = margin(b = 12)),
+    axis.title = element_text(face = "bold", color = "#2C3E50"),
+    axis.text = element_text(color = "#34495E", size = 11),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "#ECF0F1"),
+    legend.position = "top"
+  )
+
+ggplotly(p1_pretty, tooltip = "text") |>
+  layout(
+    title = list(
+      text = paste0(
+        "<b>Average Loan Interest Rate by Loan Grade & Prior Default</b><br>"
+      ),
+      x = 0.02
+    ),
+    legend = list(orientation = "h", x = 0.02, y = 1.03, title = list(text = "")),
+    margin = list(t = 85)
+  )
+
+```
+
+
+```{r}
+age_intent_query <- credit_clean |>
+  mutate(
+    age_group = case_when(
+      person_age <= 25 ~ "18–25",
+      person_age <= 35 ~ "26–35",
+      person_age <= 45 ~ "36–45",
+      TRUE ~ "46+"
+    )
+  ) |>
+  group_by(loan_intent, age_group) |>
+  summarise(
+    count = n(),
+    avg_loan_int_rate = round(mean(loan_int_rate), 2),
+    avg_age = round(mean(person_age), 1),
+    .groups = "drop"
+  ) |>
+  arrange(desc(avg_loan_int_rate))
+
+
+reactable(age_intent_query, defaultPageSize = 8, searchable = TRUE)
+
+```
+
+```{r}
+age_trend <- credit_clean |>
+  mutate(
+    intent_clean = case_when(
+      loan_intent == "DEBTCONSOLIDATION" ~ "Debt Consolidation",
+      loan_intent == "HOMEIMPROVEMENT" ~ "Home Improvement",
+      TRUE ~ str_to_title(loan_intent)
+    )
+  ) |>
+  group_by(person_age, intent_clean) |>
+  summarise(
+    avg_rate = round(mean(loan_int_rate), 2),
+    count = n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    hover_text = paste0(
+      "<b>Age:</b> ", person_age, "<br>",
+      "<b>Intent:</b> ", intent_clean, "<br>",
+      "<b>Avg Rate:</b> ", avg_rate, "%<br>",
+      "<b>Borrowers:</b> ", count
+    )
+  )
+
+p_lines <- ggplot(
+  age_trend,
+  aes(x = person_age, y = avg_rate, color = intent_clean, group = intent_clean, text = hover_text)
+) +
+  geom_smooth(aes(group = intent_clean), method = "loess", se = FALSE, linewidth = 1.2) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(8, 15)) +
+  labs(
+    title = "Loan Interest Rate Across Borrower Age via Loan Purpose",
+    x = "Age ",
+    y = "Average Loan Interest Rate",
+    color = "Loan Intent"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 15, color = "#1A2530"),
+    axis.title = element_text(face = "bold", color = "#2C3E50"),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+
+ggplotly(p_lines, tooltip = "text")
+
+
+```
+We see that these two factors, age and loan purpose are weak factors in determining the loan interest rate.
+Now, let's make our model to see which factors are the most important.
+
+
+```{r}
+credit_setup_df <- credit_clean |>
+  mutate(across(where(is.character), as.factor))
+
+full_model <- lm(
+  loan_int_rate ~ person_age + person_income + person_home_ownership + person_emp_length + loan_intent + loan_grade + loan_amnt + loan_percent_income + cb_person_default_on_file + cb_person_cred_hist_length,
+  data = credit_setup_df
+)
+```
+
+```{r}
+current_model <- full_model
+
+repeat {
+  worst <- tidy(drop1(current_model, test = "F")) |>
+    filter(!is.na(p.value), p.value > 0.05) |>
+    slice_max(p.value, n = 1)
+  
+  if (nrow(worst) == 0) break
+  
+  current_model <- update(current_model, paste(". ~ . -", worst$term))
+}
+
+# Clean tidyverse summary table of the final model
+final_summary <- tidy(current_model) |>
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+
+reactable(final_summary, defaultPageSize = 15)
+
+```
+This model has the factors that are statistically significant. However since the dataset is so large (n=29,000), some of these factors are quite practically insignificant.
+
+
+For example, we discovered person_age is a weak factor in determining the loan_int_rate, because it's practically insignificant, but it's a statistically significant factor.
+
+
+$$
+\begin{aligned}
+{\text{loan\_int\_rate}} &= 7.3674 - 0.0051(\text{person\_age}) - 0.00000018(\text{person\_income}) \\
+&\quad + 0.3268(\text{OWNERSHIP\_OTHER}) + 0.1362(\text{OWNERSHIP\_OWN}) + 0.1127(\text{OWNERSHIP\_RENT}) \\
+&\quad + 3.6334(\text{GradeB}) + 6.0855(\text{GradeC}) + 7.9699(\text{GradeD}) \\
+&\quad + 9.6154(\text{GradeE}) + 11.1983(\text{GradeF}) + 12.8389(\text{GradeG}) \\
+&\quad + 0.0000075(\text{loan\_amnt}) - 0.3371(\text{loan\_percent\_income}) + 0.0081(\text{cred\_hist\_length})
+\end{aligned}
+$$
+```{r}
+b <- coef(current_model)
+
+
+# Assisted Visualization with AI
+
+impact_df <- tibble(
+  Factor = c(
+    "Loan Grade: G (vs. A)",
+    "Loan Grade: F (vs. A)",
+    "Loan Grade: E (vs. A)",
+    "Loan Grade: D (vs. A)",
+    "Loan Grade: C (vs. A)",
+    "Loan Grade: B (vs. A)",
+    "Home Ownership: Other (vs. Mortgage)",
+    "Home Ownership: Own (vs. Mortgage)",
+    "Home Ownership: Rent (vs. Mortgage)",
+    "Credit History (+10 Years)",
+    "Loan Amount (+$10,000)",
+    "Person Income (+$25,000)",
+    "Loan Percent Income (+10%)",
+    "Borrower Age (+20 Years)"
+  ),
+  Change_Label = c(
+    "Grade A → G", "Grade A → F", "Grade A → E",
+    "Grade A → D", "Grade A → C", "Grade A → B",
+    "Mortgage → Other", "Mortgage → Own", "Mortgage → Rent",
+    "+10 years credit history", "+$10,000 borrowed",
+    "+$25,000 annual income", "+0.10 loan-to-income ratio", "+20 years older"
+  ),
+  Rate_Shift = round(c(
+    b["loan_gradeG"],
+    b["loan_gradeF"],
+    b["loan_gradeE"],
+    b["loan_gradeD"],
+    b["loan_gradeC"],
+    b["loan_gradeB"],
+    b["person_home_ownershipOTHER"],
+    b["person_home_ownershipOWN"],
+    b["person_home_ownershipRENT"],
+    b["cb_person_cred_hist_length"] * 10,
+    b["loan_amnt"] * 10000,
+    b["person_income"] * 25000,
+    b["loan_percent_income"] * 0.10,
+    b["person_age"] * 20
+  ), 3),
+  Significance_Type = c(
+    rep("Practically & Statistically Significant", 6),
+    rep("Statistically Significant Only (Negligible Effect)", 8)
+  )
+) |>
+  mutate(
+    hover_text = paste0(
+      "<b>Factor:</b> ", Factor, "<br>",
+      "<b>Scenario:</b> ", Change_Label, "<br>",
+      "<b>Interest Rate Change:</b> ", ifelse(Rate_Shift >= 0, "+", ""), Rate_Shift, " percentage points"
+    )
+  )
+
+p_all <- ggplot(
+  impact_df,
+  aes(x = reorder(Factor, Rate_Shift), y = Rate_Shift, fill = Significance_Type, text = hover_text)
+) +
+  geom_col(width = 0.7, alpha = 0.92) +
+  geom_hline(yintercept = 0, color = "#2C3E50", linewidth = 0.5) +
+  geom_text(
+    aes(
+      label = paste0(ifelse(Rate_Shift >= 0, "+", ""), round(Rate_Shift, 2), "%"),
+      hjust = ifelse(Rate_Shift >= 0, -0.15, 1.15)
+    ),
+    size = 3.2,
+    fontface = "bold",
+    color = "#1A2530"
+  ) +
+  coord_flip() +
+  scale_fill_manual(
+    values = c(
+      "Practically & Statistically Significant" = "#2B5C8F",
+      "Statistically Significant Only (Negligible Effect)" = "#E67E22"
+    )
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0(ifelse(x > 0, "+", ""), x, "%"),
+    expand = expansion(mult = c(0.12, 0.18))
+  ) +
+  labs(
+    title = "Final Model: Real-World Impact of Every Significant Predictor",
+    x = NULL,
+    y = "Change in Predicted Interest Rate (Percentage Points)",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 24) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, color = "#1A2530"),
+    axis.title = element_text(face = "bold", color = "#2C3E50"),
+    axis.text = element_text(color = "#2C3E50", size = 10),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "top"
+  )
+
+ggplotly(p_all, tooltip = "text") |>
+  layout(
+    title = list(
+      text = paste0(
+        "<b>Final Model: Real-World Impact of Every Significant
+        Predictor</b><br>"
+      ),
+      x = 0.01,
+      y = 0.96,
+      font = list(size = 15, color = "#1A2530")
+    ),
+    legend = list(
+      orientation = "h",
+      x = 0.01,
+      y = 1.07,
+      font = list(size = 11),
+      title = list(text = "")
+    ),
+    xaxis = list(title = list(font = list(size = 12))),
+    margin = list(t = 110, b = 55, l = 10, r = 20)
+  )
+
+```
+As you can see, the only genuine practically significant factor is the loan_grade.
+
+If you move down the credit tiers from Grade A to Grade G the predicted interest rates are increased by 3.63% (from Grade A to Grade B) up to 12.84% (Grade A to Grade G) which essentially dominates the entire model.
+
+You can see that the orange bars are statistically significant but not practically significant at all.
+The most statistically but not practically significant factor is Home Ownership, which is maxed out around 0.33%. This does not contribute a lot to the model.
+
+If you were to take out a $15,000 loan for three years with a 7.33% interest rate vs a 7.00%, you would be paying around 80 more dollars, which isn't too much of an increase.
